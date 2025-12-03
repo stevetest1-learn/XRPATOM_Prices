@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ATOM vs XRP Prices</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+    canvas { max-width: 100%; }
+    #download { margin-top: 12px; }
+    .controls { margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>ATOM vs XRP Prices</h1>
+
+  <div class="controls">
+    <label for="days">Days:</label>
+    <select id="days">
+      <option value="7">7</option>
+      <option value="14">14</option>
+      <option value="20" selected>20</option>
+      <option value="30">30</option>
+      <option value="90">90</option>
+    </select>
+    <button id="reload">Reload</button>
+  </div>
+
+  <canvas id="pricesChart" width="800" height="400"></canvas>
+
+  <div id="download">
+    <a href="/api/prices/csv" id="csvLink">Download CSV</a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    let chart = null;
+
+    async function loadData(days = 20) {
+      try {
+        const res = await fetch(`/api/prices?days=${days}`);
+        const arr = await res.json();
+        if (!Array.isArray(arr) || arr.length === 0) {
+          document.getElementById('pricesChart').replaceWith(document.createElement('div')).textContent = 'No data';
+          return;
+        }
+
+        const labels = arr.map(r => r.date);
+        const atom = arr.map(r => r.atom_price !== undefined ? Number(r.atom_price) : null);
+        const xrp = arr.map(r => r.xrp_price !== undefined ? Number(r.xrp_price) : null);
+
+        return { labels, atom, xrp };
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    }
+
+    function formatUSD(value) {
+      if (value === null || value === undefined || isNaN(value)) return '-';
+      return value >= 1 ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value.toFixed(6);
+    }
+
+    async function renderChart(days = 20) {
+      const data = await loadData(days);
+      if (!data) {
+        document.body.insertAdjacentHTML('beforeend', '<p>Error loading chart.</p>');
+        return;
+      }
+
+      const ctx = document.getElementById('pricesChart').getContext('2d');
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [
+            {
+              label: 'ATOM (USD)',
+              data: data.atom,
+              borderColor: 'rgba(33, 150, 243, 1)',
+              backgroundColor: 'rgba(33, 150, 243, 0.2)',
+              tension: 0.2,
+              yAxisID: 'y',
+              pointRadius: 3
+            },
+            {
+              label: 'XRP (USD)',
+              data: data.xrp,
+              borderColor: 'rgba(255, 159, 64, 1)',
+              backgroundColor: 'rgba(255, 159, 64, 0.2)',
+              tension: 0.2,
+              yAxisID: 'y',
+              pointRadius: 3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const label = ctx.dataset.label || '';
+                  const val = ctx.parsed.y;
+                  return `${label}: ${formatUSD(val)}`;
+                }
+              }
+            },
+            legend: { display: true }
+          },
+          scales: {
+            x: {
+              display: true,
+              title: { display: true, text: 'Date' }
+            },
+            y: {
+              display: true,
+              title: { display: true, text: 'Price (USD)' },
+              ticks: {
+                callback: (value) => {
+                  if (value < 1) return value.toFixed(6);
+                  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // update CSV link to include days param
+      document.getElementById('csvLink').href = `/api/prices/csv?days=${days}`;
+    }
+
+    document.getElementById('reload').addEventListener('click', () => {
+      const days = document.getElementById('days').value;
+      renderChart(days);
+    });
+
+    // initial load
+    renderChart(document.getElementById('days').value);
+  </script>
+</body>
+</html>
