@@ -1,7 +1,12 @@
 from flask import Flask, jsonify, render_template, Response, request
 from flask_cors import CORS
 import pandas as pd
-from get_xrp_price import get_atom_price_data, get_xrp_price_data
+from get_xrp_price import (
+    get_atom_price_data,
+    get_xrp_price_data,
+    get_btc_price_data,
+    get_eth_price_data,
+)
 import os
 
 app = Flask(__name__)
@@ -11,10 +16,15 @@ CORS(app)
 def merged_prices(days=20):
     atom = get_atom_price_data(days=days)
     xrp = get_xrp_price_data(days=days)
-    if atom.empty and xrp.empty:
+    btc = get_btc_price_data(days=days)
+    eth = get_eth_price_data(days=days)
+    dfs = [df for df in [atom, xrp, btc, eth] if not df.empty]
+    if not dfs:
         return pd.DataFrame()
-    df = pd.merge(atom, xrp, on="date", how="outer").sort_values("date")
-    df = df.reset_index(drop=True)
+    df = dfs[0]
+    for other in dfs[1:]:
+        df = pd.merge(df, other, on="date", how="outer")
+    df = df.sort_values("date").reset_index(drop=True)
     return df
 
 

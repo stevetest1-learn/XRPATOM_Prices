@@ -44,12 +44,24 @@ def get_xrp_price_data(days=20):
     return get_price_data(coin_id="ripple", column_name="xrp_price", days=days)
 
 
+def get_btc_price_data(days=20):
+    return get_price_data(coin_id="bitcoin", column_name="btc_price", days=days)
+
+
+def get_eth_price_data(days=20):
+    return get_price_data(coin_id="ethereum", column_name="eth_price", days=days)
+
+
 if __name__ == "__main__":
     atom_df = get_atom_price_data(days=20)
     xrp_df = get_xrp_price_data(days=20)
-    if not atom_df.empty and not xrp_df.empty:
-        df = pd.merge(atom_df, xrp_df, on="date", how="outer").sort_values("date")
-        print("ATOM & XRP Price Data (last 20 days):")
+    btc_df = get_btc_price_data(days=20)
+    eth_df = get_eth_price_data(days=20)
+    if not atom_df.empty and not xrp_df.empty and not btc_df.empty and not eth_df.empty:
+        df = atom_df
+        for other in [xrp_df, btc_df, eth_df]:
+            df = pd.merge(df, other, on="date", how="outer")
+        print("ATOM, XRP, BTC & ETH Price Data (last 20 days):")
         print(df)
     else:
-        print("Could not retrieve either ATOM or XRP data.")
+        print("Could not retrieve the full set of ATOM, XRP, BTC, and ETH data.")
